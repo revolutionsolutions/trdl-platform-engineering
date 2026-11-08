@@ -70,12 +70,5 @@ jobs:
       - name: Initialise Terraform
         run: terraform init
 
-      - name: Check Terraform remote state
-        run: |
-          echo "Terraform backend:"
-          terraform state pull | jq -r '.lineage, .serial'
-          echo "Managed resource count:"
-          terraform state list | wc -l
-
       - name: Terraform Plan
         run: terraform plan -no-color
