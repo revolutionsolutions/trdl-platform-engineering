@@ -18,6 +18,11 @@ rules:
       - update
       - patch
       - delete
+  - apiGroups: [""]
+    resources:
+      - pods/portforward
+    verbs:
+      - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
