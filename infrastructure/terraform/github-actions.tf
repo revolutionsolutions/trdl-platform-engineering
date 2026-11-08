@@ -134,3 +134,31 @@ resource "aws_iam_role_policy" "github_actions_ec2_read" {
     ]
   })
 }
+
+# These are read-only permissions for Terraform refresh and discovery
+resource "aws_iam_role_policy" "github_actions_infrastructure_read" {
+  name = "trdl-github-actions-infrastructure-read"
+  role = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:DescribeRepositories",
+          "iam:GetRole",
+          "iam:GetOpenIDConnectProvider",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeAddresses",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeRouteTables",
+          "ec2:DescribeInternetGateways",
+          "ec2:DescribeNatGateways",
+          "ec2:DescribeSecurityGroups"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
