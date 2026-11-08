@@ -166,7 +166,11 @@ resource "aws_iam_role_policy" "github_actions_infrastructure_read" {
           "ec2:DescribeRouteTables",
           "ec2:DescribeInternetGateways",
           "ec2:DescribeNatGateways",
-          "ec2:DescribeSecurityGroups"
+          "ec2:DescribeSecurityGroups",
+
+          "eks:DescribeAccessEntry",
+          "eks:DescribeNodegroup",
+          "eks:DescribeAddon",
         ]
         Resource = "*"
       }
