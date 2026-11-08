@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: trdl
-          image: 060565307346.dkr.ecr.us-east-1.amazonaws.com/trdl:v1
+          image: 632320832399.dkr.ecr.us-east-1.amazonaws.com/trdl:v1
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

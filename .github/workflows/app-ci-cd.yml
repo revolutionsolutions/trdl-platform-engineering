@@ -1,0 +1,130 @@
+
+name: TRDL Application CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - "docker/**"
+      - "kubernetes/**"
+      - ".github/workflows/app-ci-cd.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - "docker/**"
+      - "kubernetes/**"
+      - ".github/workflows/app-ci-cd.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trdl-production-deployment
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test application
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        run: python -m pytest -v app/tests/
+
+  build-and-deploy:
+    name: Build and deploy to EKS
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      AWS_REGION: us-east-1
+      ECR_REPOSITORY: trdl
+      EKS_CLUSTER_NAME: trdl-eks
+      K8S_NAMESPACE: trdl
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::632320832399:role/trdl-github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -f docker/Dockerfile .
+          docker push $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --name "$EKS_CLUSTER_NAME" \
+            --region "$AWS_REGION"
+
+      - name: Deploy to Kubernetes
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/trdl:${{ github.sha }}
+        run: |
+          kubectl set image deployment/trdl \
+            trdl="$IMAGE" \
+            --namespace "$K8S_NAMESPACE"
+
+      - name: Verify deployment rollout
+        run: |
+          kubectl rollout status deployment/trdl \
+            --namespace "$K8S_NAMESPACE" \
+            --timeout=180s
+
+      - name: Verify application health
+        run: |
+          kubectl port-forward \
+            --namespace "$K8S_NAMESPACE" \
+            service/trdl 8080:80 > /tmp/trdl-port-forward.log 2>&1 &
+          PF_PID=$!
+          trap 'kill $PF_PID 2>/dev/null || true' EXIT
+
+          for i in {1..15}; do
+            if curl --silent --fail http://localhost:8080/health/ready; then
+              echo "TRDL is responding successfully."
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "TRDL health check failed."
+          cat /tmp/trdl-port-forward.log
+          exit 1
