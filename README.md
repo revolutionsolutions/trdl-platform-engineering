@@ -14,7 +14,7 @@ The application provides:
 | `GET /health/live` | Liveness check | `{"status":"alive"}` |
 | `GET /health/ready` | Readiness check | `{"status":"ready"}` |
 
-This is a proof of concept, not a production deployment. The architecture demonstrates some availability and operational practices but does not claim to meet a several-nines SLA.
+This is a proof of concept, not a production deployment. The architecture demonstrates availability and operational practices but does not claim to meet a several-nines SLA.
 
 ## 2. Architecture
 
@@ -24,9 +24,10 @@ The solution uses the following AWS services and technologies:
 - **Amazon ECR:** Container image registry.
 - **Amazon VPC:** Network isolation across two Availability Zones.
 - **EC2 managed node group:** Kubernetes worker nodes.
+- **Amazon S3:** Remote Terraform state storage.
 - **Terraform:** Infrastructure as Code.
 - **Docker:** Application containerisation.
-- **GitHub Actions:** Automated testing, building and deployment.
+- **GitHub Actions:** Automated testing, building, deployment and Terraform validation.
 - **GitHub OIDC:** Short-lived AWS credentials without storing static AWS access keys.
 - **Kubernetes RBAC:** Namespace-scoped deployment permissions.
 
@@ -41,6 +42,8 @@ The solution uses the following AWS services and technologies:
 7. Kubernetes performs a rolling update.
 8. The pipeline verifies the rollout and application readiness endpoint.
 
+Terraform infrastructure changes follow a separate workflow, which validates pull requests and generates a plan for pushes to `main`.
+
 ## 3. Repository structure
 
 ```text
@@ -53,13 +56,18 @@ trdl/
 ├── docker/
 │   └── Dockerfile
 ├── infrastructure/
-│   └── terraform/
+│   ├── terraform/
+│   │   ├── backend.tf
+│   │   └── *.tf
+│   └── terraform-bootstrap/
+│       └── main.tf
 ├── kubernetes/
 │   ├── trdl.yaml
 │   └── github-actions-rbac.yaml
 ├── .github/
 │   └── workflows/
-│       └── app-ci-cd.yml
+│       ├── app-ci-cd.yml
+│       └── terraform-ci.yml
 ├── docs/
 ├── DISCOVERY.md
 ├── ARCHITECTURE_DECISIONS.md
@@ -161,20 +169,49 @@ Expected response:
 The Terraform configuration is located in:
 
 ```text
-infrastructure/terraform/
+infrastructure/
+├── terraform-bootstrap/
+└── terraform/
 ```
 
-Initialise Terraform:
+### 7.1 Bootstrap the Terraform state bucket
+
+The bootstrap configuration creates the S3 bucket used to store the main Terraform state.
+
+Run this step once:
 
 ```bash
-cd infrastructure/terraform
+cd infrastructure/terraform-bootstrap
 terraform init
+terraform fmt -check
+terraform validate
+terraform plan
+terraform apply
+```
+
+The state bucket has versioning enabled and is configured for server-side encryption and public access blocking.
+
+The bootstrap configuration maintains its own local Terraform state. Keep that state secure and do not commit it to Git.
+
+### 7.2 Initialise the main Terraform configuration
+
+The main infrastructure configuration uses an S3 backend with native state locking.
+
+```bash
+cd ../terraform
+terraform init
+```
+
+If migrating from an existing local Terraform state, use:
+
+```bash
+terraform init -migrate-state
 ```
 
 Validate the configuration:
 
 ```bash
-terraform fmt -check
+terraform fmt -check -recursive
 terraform validate
 ```
 
@@ -184,7 +221,7 @@ Review the proposed infrastructure changes:
 terraform plan
 ```
 
-Apply the infrastructure:
+Apply the infrastructure when the plan has been reviewed:
 
 ```bash
 terraform apply
@@ -192,7 +229,7 @@ terraform apply
 
 Review Terraform outputs for the ECR repository URL and other infrastructure details.
 
-**Important:** Terraform currently uses local state. Keep the state file secure and do not commit it to Git. For a shared or production environment, use a remote backend with state locking and appropriate access controls.
+The main Terraform state is stored in S3 rather than committed to the repository. State access is restricted through AWS IAM permissions.
 
 ## 8. Deploy to Kubernetes
 
@@ -225,6 +262,8 @@ Wait for the rollout:
 kubectl rollout status deployment/trdl -n trdl
 ```
 
+The service is configured as a ClusterIP service, so it is not directly accessible from the public internet.
+
 For local testing, use port forwarding:
 
 ```bash
@@ -237,7 +276,17 @@ Then:
 curl http://localhost:8080/
 ```
 
+Expected response:
+
+```text
+42
+```
+
 ## 9. CI/CD configuration
+
+Two GitHub Actions workflows are used.
+
+### Application CI/CD
 
 The application pipeline is defined in:
 
@@ -245,15 +294,40 @@ The application pipeline is defined in:
 .github/workflows/app-ci-cd.yml
 ```
 
-The workflow runs tests for pull requests and pushes to `main`. Deployment runs only after a successful test job on a push to `main`.
+The workflow runs the following steps:
 
-AWS authentication uses GitHub OIDC.
+- Runs Python unit tests.
+- Validates Kubernetes manifests using Kubeconform.
+- Builds the Docker image.
+- Scans the image for HIGH and CRITICAL vulnerabilities using Trivy.
+- Pushes the image to Amazon ECR.
+- Deploys the updated image to EKS.
+- Verifies the deployment rollout and application health.
 
-The IAM role trust policy is restricted to this repository and the `main` branch. The role has permissions to push images to ECR and describe the EKS cluster. Kubernetes RBAC grants deployment permissions within the `trdl` namespace.
+Pull requests run the tests, manifest validation, image build and vulnerability scan. Deployment runs only after successful checks on a push to `main`.
+
+AWS authentication uses GitHub OIDC. The IAM role trust policy is restricted to the repository and the `main` branch. Kubernetes RBAC grants deployment permissions within the `trdl` namespace.
 
 No static AWS access keys are stored in GitHub.
 
 The deployment uses the Git commit SHA as the image tag, allowing deployed versions to be traced back to source code.
+
+### Terraform CI
+
+The infrastructure pipeline is defined in:
+
+```text
+.github/workflows/terraform-ci.yml
+```
+
+It performs the following checks:
+
+- Terraform formatting and validation run on pull requests and pushes to `main`.
+- Terraform planning runs on pushes to `main`.
+- AWS authentication uses GitHub OIDC.
+- The workflow accesses the existing S3 remote state.
+
+The workflow does not automatically apply infrastructure changes. Terraform apply remains a manual operation.
 
 ## 10. Availability and resilience
 
@@ -262,13 +336,13 @@ The PoC includes several availability-oriented choices:
 - Three application replicas.
 - Kubernetes readiness and liveness probes.
 - Rolling updates with `maxUnavailable: 0`.
-- Worker nodes distributed across two Availability Zones.
+- Worker nodes deployed across two Availability Zones.
 - Private worker-node subnets.
 - A ClusterIP service for internal application access.
 
 These choices improve resilience, but they do not establish a several-nines SLA.
 
-The current design also uses a single NAT Gateway, which is a potential availability limitation. The PoC does not include a production-grade external load-balancing, disaster-recovery or multi-region strategy.
+The current design also uses a single NAT Gateway, which is a potential availability limitation. The PoC does not include production-grade external load balancing, disaster recovery or a multi-region strategy.
 
 ## 11. Production considerations
 
@@ -281,7 +355,6 @@ Before using this architecture in production, further work would be required, in
 - Backup and disaster-recovery procedures.
 - Security scanning and image vulnerability management.
 - Controlled infrastructure and application upgrades.
-- Remote Terraform state and locking.
 - Capacity planning and load testing.
 - Operational incident response procedures.
 
@@ -291,4 +364,3 @@ These are intentionally outside the implementation scope of this PoC.
 
 - [Discovery and effort estimation](DISCOVERY.md)
 - [Architecture decisions](ARCHITECTURE_DECISIONS.md)
-
