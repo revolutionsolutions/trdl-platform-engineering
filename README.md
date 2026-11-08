@@ -287,20 +287,7 @@ Before using this architecture in production, further work would be required, in
 
 These are intentionally outside the implementation scope of this PoC.
 
-## 12. Cleanup
-
-To avoid unnecessary AWS charges, destroy the infrastructure when the assessment is complete:
-
-```bash
-cd infrastructure/terraform
-terraform destroy
-```
-
-Review the resources Terraform plans to remove before confirming.
-
-Also verify that no manually created resources remain, particularly ECR images and repositories, NAT Gateways, Elastic IPs and other billable resources.
-
-## 13. Further documentation
+## 12. Further documentation
 
 - [Discovery and effort estimation](DISCOVERY.md)
 - [Architecture decisions](ARCHITECTURE_DECISIONS.md)
