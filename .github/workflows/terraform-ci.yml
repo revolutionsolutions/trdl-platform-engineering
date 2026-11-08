@@ -15,10 +15,11 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   terraform:
-    name: Terraform Format and Validate
+    name: Terraform Format, Validate and Plan
     runs-on: ubuntu-latest
 
     defaults:
@@ -32,11 +33,20 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::632320832399:role/trdl-github-actions-deploy-role
+          aws-region: us-east-1
+
       - name: Check formatting
         run: terraform fmt -check -recursive
 
       - name: Initialise Terraform
-        run: terraform init -backend=false
+        run: terraform init
 
       - name: Validate Terraform
         run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -no-color
