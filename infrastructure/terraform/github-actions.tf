@@ -17,7 +17,7 @@ data "aws_iam_policy_document" "github_actions_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:revolutionsolutions/trdl-platform-engineering:ref:refs/heads/main"]
+      values   = ["repo:revolutionsolutions@287054075/trdl-platform-engineering@1449381491:ref:refs/heads/main"]
     }
   }
 }
