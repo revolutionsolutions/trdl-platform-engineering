@@ -69,6 +69,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check GitHub OIDC token claims
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken('sts.amazonaws.com');
+            const payload = JSON.parse(
+              Buffer.from(token.split('.')[1], 'base64url').toString()
+            );
+
+            console.log('OIDC issuer:', payload.iss);
+            console.log('OIDC audience:', payload.aud);
+            console.log('OIDC subject:', payload.sub);
+            AWSTemplateFormatVersion: "2010-09-09"
+            AWSTemplateFormatVersion: "2010-09-09"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
