@@ -62,4 +62,88 @@ The Terraform GitHub Actions workflow validates the configuration and runs a pla
 
 I initially considered using a `LoadBalancer` Service with a Network Load Balancer for external access. I kept the final implementation simpler and used `ClusterIP` instead.
 
-The application was deployed and tested
+The application was deployed and tested through Kubernetes port forwarding rather than a public endpoint. This was a scope decision for the PoC.
+
+The Deployment includes:
+
+- Three application replicas.
+- Readiness and liveness probes.
+- Resource requests and limits.
+- A rolling update strategy with `maxSurge: 1` and `maxUnavailable: 0`.
+
+The EKS worker nodes are deployed across two Availability Zones.
+
+A PodDisruptionBudget and explicit pod topology spread constraints were not included in this version. These would be useful improvements to consider for a production deployment.
+
+These settings provide a reasonable starting point for resilience, but they do not guarantee a particular uptime target. A node or Availability Zone failure can still affect the service.
+
+## 6. GitHub Actions and AWS authentication
+
+**Decision:** Use GitHub Actions for testing, image publishing and deployment. Use AWS OIDC for authentication.
+
+The application workflow runs the following checks:
+
+- Python unit tests.
+- Kubernetes manifest validation using Kubeconform.
+- Docker image build.
+- Trivy vulnerability scanning for HIGH and CRITICAL vulnerabilities.
+
+These checks run for pull requests and pushes to `main`.
+
+For a push to `main`, after successful checks, the workflow authenticates to AWS, pushes the image to ECR and updates the EKS Deployment. It then verifies the deployment rollout and application health.
+
+Kubeconform validates all YAML manifests in the Kubernetes directory against the Kubernetes 1.35 schemas. This helps catch unsupported or incorrect fields before deployment.
+
+I do not store permanent AWS access keys in GitHub. The OIDC role trust policy is restricted to the repository and the `main` branch. Kubernetes RBAC grants deployment permissions within the `trdl` namespace.
+
+The Terraform workflow is separate from the application workflow. It validates Terraform configuration and runs a plan, but does not automatically apply changes.
+
+For a real production setup, I would also expect protected environments and approval rules before deployment.
+
+## 7. Keep monitoring simple for the PoC
+
+**Decision:** Use application health endpoints, Kubernetes probes, logs and a deployment smoke test.
+
+A full monitoring stack would be more work than this application needs. The PoC should show that the service starts, becomes ready and responds correctly.
+
+The deployment workflow checks the rollout status and calls the readiness endpoint after deployment. This gives a basic confirmation that the application is running.
+
+For production, I would add service-level dashboards, alerting, centralised logs and a clear on-call process. I would also agree how availability is measured before discussing an SLA.
+
+## 8. Be clear about the availability claim
+
+**Decision:** Do not claim that this PoC achieves several nines of availability.
+
+Three replicas and multiple Availability Zones are useful design choices, but they are not proof of long-term uptime.
+
+Availability also depends on cluster capacity, network design, AWS services, deployment process, monitoring and the team's response to incidents.
+
+The final network uses public and private subnets across two Availability Zones. Worker nodes run in private subnets, with a single NAT Gateway providing outbound internet access.
+
+The single NAT Gateway is a cost-conscious choice, but it introduces a potential availability limitation. It is not equivalent to a highly available multi-AZ NAT design.
+
+For production, I would first agree on the SLI, SLO and SLA, then test the failure scenarios and collect evidence over time.
+
+## 9. Cost and cleanup
+
+**Decision:** Keep the AWS environment small and remove it when the exercise is finished.
+
+EKS, EC2, NAT Gateway, storage and public IP addresses can all add cost.
+
+I used two public and two private subnets across two Availability Zones. The worker nodes run in private subnets, and a single NAT Gateway provides outbound internet access.
+
+Using one NAT Gateway keeps the PoC cost lower than deploying one per Availability Zone, but it introduces a potential availability limitation. A production environment with stricter availability requirements would need a different approach.
+
+The deployment guide should include the steps to destroy the environment and remove any remaining resources.
+
+------------------------------------------------------------------------
+
+## Summary
+
+The final solution uses AWS, EKS, Python, Docker, ECR, Terraform and GitHub Actions.
+
+It also includes Trivy for container vulnerability scanning, Kubeconform for Kubernetes manifest validation, S3 for Terraform remote state and GitHub OIDC for AWS authentication.
+
+The main focus was to deliver a working and repeatable deployment without adding tools that do not solve a real problem in this exercise.
+
+The PoC demonstrates the main parts of a small platform delivery workflow, but it is not a production-ready service. The remaining improvements, particularly around availability, monitoring, network resilience and operational controls, would need to be considered before using it for a real production workload.
