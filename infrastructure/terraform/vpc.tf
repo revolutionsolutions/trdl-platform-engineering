@@ -1,7 +1,9 @@
+# Data Sources
 data "aws_availability_zones" "available" {
   state = "available"
 }
 
+# VPC
 resource "aws_vpc" "trdl" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
@@ -12,34 +14,7 @@ resource "aws_vpc" "trdl" {
   }
 }
 
-resource "aws_internet_gateway" "trdl" {
-  vpc_id = aws_vpc.trdl.id
-
-  tags = {
-    Name = "trdl-igw"
-  }
-}
-
-resource "aws_eip" "nat" {
-  domain = "vpc"
-
-  tags = {
-    Name = "trdl-nat"
-  }
-}
-
-# NAT Gateway
-resource "aws_nat_gateway" "ngw" {
-  allocation_id = aws_eip.nat.allocation_id
-  subnet_id     = aws_subnet.public_subnet1.id
-
-  tags = {
-    Name = "trdl-ngw"
-  }
-
-  depends_on = [aws_internet_gateway.trdl]
-}
-
+# Public Subnet
 resource "aws_subnet" "public_subnet1" {
   vpc_id                  = aws_vpc.trdl.id
   cidr_block              = "10.0.1.0/24"
@@ -66,6 +41,7 @@ resource "aws_subnet" "public_subnet2" {
   }
 }
 
+# Private Subnet
 resource "aws_subnet" "private_subnet1" {
   vpc_id            = aws_vpc.trdl.id
   cidr_block        = "10.0.101.0/24"
@@ -90,6 +66,37 @@ resource "aws_subnet" "private_subnet2" {
   }
 }
 
+# Internet Gateway
+resource "aws_internet_gateway" "trdl" {
+  vpc_id = aws_vpc.trdl.id
+
+  tags = {
+    Name = "trdl-igw"
+  }
+}
+
+# EIP for NAT Gateway
+resource "aws_eip" "nat" {
+  domain = "vpc"
+
+  tags = {
+    Name = "trdl-nat"
+  }
+}
+
+# NAT Gateway
+resource "aws_nat_gateway" "ngw" {
+  allocation_id = aws_eip.nat.allocation_id
+  subnet_id     = aws_subnet.public_subnet1.id
+
+  tags = {
+    Name = "trdl-ngw"
+  }
+
+  depends_on = [aws_internet_gateway.trdl]
+}
+
+# Routing table for public subnet
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.trdl.id
 
@@ -113,6 +120,7 @@ resource "aws_route_table_association" "public_subnet2" {
   route_table_id = aws_route_table.public.id
 }
 
+# Routing table for private subnet
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.trdl.id
 
