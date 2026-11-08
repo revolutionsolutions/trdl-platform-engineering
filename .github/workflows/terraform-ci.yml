@@ -1,4 +1,3 @@
-
 name: Terraform CI
 
 on:
@@ -15,12 +14,41 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  terraform:
-    name: Terraform Format, Validate and Plan
+  validate:
+    name: Terraform Format and Validate
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: infrastructure/terraform
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+
+      - name: Initialise Terraform
+        run: terraform init -backend=false
+
+      - name: Validate Terraform
+        run: terraform validate
+
+  plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      id-token: write
 
     defaults:
       run:
@@ -39,14 +67,15 @@ jobs:
           role-to-assume: arn:aws:iam::632320832399:role/trdl-github-actions-deploy-role
           aws-region: us-east-1
 
-      - name: Check formatting
-        run: terraform fmt -check -recursive
-
       - name: Initialise Terraform
         run: terraform init
 
-      - name: Validate Terraform
-        run: terraform validate
+      - name: Check Terraform remote state
+        run: |
+          echo "Terraform backend:"
+          terraform state pull | jq -r '.lineage, .serial'
+          echo "Managed resource count:"
+          terraform state list | wc -l
 
       - name: Terraform Plan
         run: terraform plan -no-color

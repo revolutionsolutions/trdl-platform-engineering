@@ -78,3 +78,59 @@ resource "aws_iam_role_policy" "github_actions_eks" {
     ]
   })
 }
+
+# IAM policy to grants access only to the state and lock objects used by this project
+resource "aws_iam_role_policy" "github_actions_terraform_state" {
+  name = "trdl-github-actions-terraform-state"
+  role = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = [
+          "arn:aws:s3:::trdl-terraform-state-20261108/trdl/terraform.tfstate",
+          "arn:aws:s3:::trdl-terraform-state-20261108/trdl/terraform.tfstate.tflock"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket"
+        ]
+        Resource = "arn:aws:s3:::trdl-terraform-state-20261108"
+        Condition = {
+          StringLike = {
+            "s3:prefix" = [
+              "trdl/*"
+            ]
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "github_actions_ec2_read" {
+  name = "trdl-github-actions-ec2-read"
+  role = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeAvailabilityZones"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
