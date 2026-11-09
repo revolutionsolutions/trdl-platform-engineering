@@ -6,5 +6,5 @@ variable "aws_region" {
 variable "terraform_state_bucket" {
   description = "S3 bucket used to store Terraform state"
   type        = string
-  default     = "trdl-terraform-state-20261109"
+  default     = "trdl-terraform-state-2026110902"
 }
