@@ -69,10 +69,10 @@ jobs:
       id-token: write
 
     env:
-      AWS_REGION: us-east-1
-      ECR_REPOSITORY: trdl
-      EKS_CLUSTER_NAME: trdl-eks
-      K8S_NAMESPACE: trdl
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+      K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE }}
 
     steps:
       - name: Checkout repository
@@ -101,7 +101,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::028780196449:role/trdl-github-actions-deploy-role
+          role-to-assume: ${{ vars.AWS_GITHUB_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Log in to Amazon ECR

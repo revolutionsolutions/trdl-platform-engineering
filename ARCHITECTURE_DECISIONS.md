@@ -124,17 +124,15 @@ The single NAT Gateway is a cost-conscious choice, but it introduces a potential
 
 For production, I would first agree on the SLI, SLO and SLA, then test the failure scenarios and collect evidence over time.
 
-## 9. Cost and cleanup
+## 9. Cost
 
-**Decision:** Keep the AWS environment small and remove it when the exercise is finished.
+**Decision:** Keep the AWS environment small.
 
 EKS, EC2, NAT Gateway, storage and public IP addresses can all add cost.
 
 I used two public and two private subnets across two Availability Zones. The worker nodes run in private subnets, and a single NAT Gateway provides outbound internet access.
 
 Using one NAT Gateway keeps the PoC cost lower than deploying one per Availability Zone, but it introduces a potential availability limitation. A production environment with stricter availability requirements would need a different approach.
-
-The deployment guide should include the steps to destroy the environment and remove any remaining resources.
 
 ------------------------------------------------------------------------
 
