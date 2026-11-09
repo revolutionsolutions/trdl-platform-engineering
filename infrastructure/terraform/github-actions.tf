@@ -95,8 +95,8 @@ resource "aws_iam_role_policy" "github_actions_terraform_state" {
           "s3:DeleteObject"
         ]
         Resource = [
-          "arn:aws:s3:::trdl-terraform-state-20261108/trdl/terraform.tfstate",
-          "arn:aws:s3:::trdl-terraform-state-20261108/trdl/terraform.tfstate.tflock"
+          "arn:aws:s3:::trdl-terraform-state-20261109/trdl/terraform.tfstate",
+          "arn:aws:s3:::trdl-terraform-state-20261109/trdl/terraform.tfstate.tflock"
         ]
       },
       {
@@ -104,7 +104,7 @@ resource "aws_iam_role_policy" "github_actions_terraform_state" {
         Action = [
           "s3:ListBucket"
         ]
-        Resource = "arn:aws:s3:::trdl-terraform-state-20261108"
+        Resource = "arn:aws:s3:::trdl-terraform-state-20261109"
         Condition = {
           StringLike = {
             "s3:prefix" = [
