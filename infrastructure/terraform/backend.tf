@@ -1,3 +1,4 @@
+# S3 remote state configuration
 terraform {
   backend "s3" {
     bucket       = "trdl-terraform-state-20261109"

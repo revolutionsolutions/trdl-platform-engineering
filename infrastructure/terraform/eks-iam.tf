@@ -26,7 +26,6 @@ resource "aws_iam_role_policy_attachment" "eks_cluster" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 
-######################################################################################
 # EKS worker node IAM role
 resource "aws_iam_role" "eks_node" {
   name = "trdl-eks-node-role"

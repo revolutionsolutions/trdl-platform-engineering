@@ -1,3 +1,4 @@
+# GitHub Actions IAM permissions
 data "aws_iam_policy_document" "github_actions_trust" {
   statement {
     effect  = "Allow"
@@ -22,6 +23,7 @@ data "aws_iam_policy_document" "github_actions_trust" {
   }
 }
 
+# IAM role for Github action
 resource "aws_iam_role" "github_actions" {
   name               = "trdl-github-actions-deploy-role"
   assume_role_policy = data.aws_iam_policy_document.github_actions_trust.json
@@ -32,6 +34,7 @@ resource "aws_iam_role" "github_actions" {
   }
 }
 
+# IAM policy for ECR
 resource "aws_iam_role_policy" "github_actions_ecr" {
   name = "trdl-github-actions-ecr-push"
   role = aws_iam_role.github_actions.id
@@ -61,6 +64,7 @@ resource "aws_iam_role_policy" "github_actions_ecr" {
   })
 }
 
+# IAM policy for EKS
 resource "aws_iam_role_policy" "github_actions_eks" {
   name = "trdl-github-actions-eks"
   role = aws_iam_role.github_actions.id
@@ -95,8 +99,8 @@ resource "aws_iam_role_policy" "github_actions_terraform_state" {
           "s3:DeleteObject"
         ]
         Resource = [
-          "arn:aws:s3:::trdl-terraform-state-20261109/trdl/terraform.tfstate",
-          "arn:aws:s3:::trdl-terraform-state-20261109/trdl/terraform.tfstate.tflock"
+          "arn:aws:s3:::${var.terraform_state_bucket}/trdl/terraform.tfstate",
+          "arn:aws:s3:::${var.terraform_state_bucket}/trdl/terraform.tfstate.tflock"
         ]
       },
       {
@@ -104,7 +108,7 @@ resource "aws_iam_role_policy" "github_actions_terraform_state" {
         Action = [
           "s3:ListBucket"
         ]
-        Resource = "arn:aws:s3:::trdl-terraform-state-20261109"
+        Resource = "arn:aws:s3:::${var.terraform_state_bucket}"
         Condition = {
           StringLike = {
             "s3:prefix" = [
@@ -117,26 +121,7 @@ resource "aws_iam_role_policy" "github_actions_terraform_state" {
   })
 }
 
-resource "aws_iam_role_policy" "github_actions_ec2_read" {
-  name = "trdl-github-actions-ec2-read"
-  role = aws_iam_role.github_actions.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "ec2:DescribeAvailabilityZones"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
 # These are read-only permissions for Terraform refresh and discovery
-
 resource "aws_iam_role_policy" "github_actions_infrastructure_read" {
   name = "trdl-github-actions-infrastructure-read"
   role = aws_iam_role.github_actions.id

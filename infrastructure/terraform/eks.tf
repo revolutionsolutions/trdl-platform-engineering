@@ -1,10 +1,11 @@
+# EKS cluster
 resource "aws_eks_cluster" "trdl" {
   name     = "trdl-eks"
   role_arn = aws_iam_role.eks_cluster.arn
   version  = "1.35"
 
   access_config {
-    authentication_mode                         = "API_AND_CONFIG_MAP"
+    authentication_mode                         = "API"
     bootstrap_cluster_creator_admin_permissions = true
   }
 
@@ -28,7 +29,7 @@ resource "aws_eks_cluster" "trdl" {
   }
 }
 
-#########################################################
+# EKS node group
 resource "aws_eks_node_group" "trdl" {
   cluster_name    = aws_eks_cluster.trdl.name
   node_group_name = "trdl-node-group"

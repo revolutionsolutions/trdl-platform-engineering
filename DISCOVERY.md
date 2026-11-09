@@ -8,7 +8,7 @@
 
 ## 1. What I understand from the assignment
 
-TRDL is a very small web service. When someone sends a `GET` request to it, it should return `42`.
+TRDL is a small web service. When someone sends a `GET` request to it, it should return `42`.
 
 The application itself is not complicated. The interesting part of this exercise is how to package it, deploy it to Kubernetes, make the deployment repeatable, and show that the service can recover from some common failures.
 
