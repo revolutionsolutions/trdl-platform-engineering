@@ -15,7 +15,7 @@ provider "aws" {
 }
 
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "trdl-terraform-state-2026110902"
+  bucket = "trdl-terraform-state-20261111"
 
   force_destroy = true
 
